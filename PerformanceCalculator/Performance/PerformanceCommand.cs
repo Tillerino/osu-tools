@@ -1,13 +1,16 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
 using System.IO;
 using System.Linq;
+using Humanizer;
 using JetBrains.Annotations;
 using McMaster.Extensions.CommandLineUtils;
+using Newtonsoft.Json;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 
 namespace PerformanceCalculator.Performance
@@ -38,11 +41,15 @@ namespace PerformanceCalculator.Performance
 
                 var ruleset = score.ScoreInfo.Ruleset.CreateInstance();
                 var difficultyCalculator = ruleset.CreateDifficultyCalculator(workingBeatmap);
-                var difficultyAttributes = difficultyCalculator.Calculate(LegacyHelper.TrimNonDifficultyAdjustmentMods(ruleset, score.ScoreInfo.Mods).ToArray());
-                var performanceCalculator = score.ScoreInfo.Ruleset.CreateInstance().CreatePerformanceCalculator(difficultyAttributes, score.ScoreInfo);
 
-                var categoryAttribs = new Dictionary<string, double>();
-                double pp = performanceCalculator.Calculate(categoryAttribs);
+                Mod[] mods = score.ScoreInfo.Mods;
+                if (score.ScoreInfo.IsLegacyScore)
+                    mods = LegacyHelper.ConvertToLegacyDifficultyAdjustmentMods(ruleset, mods);
+
+                var difficultyAttributes = difficultyCalculator.Calculate(mods);
+                var performanceCalculator = score.ScoreInfo.Ruleset.CreateInstance().CreatePerformanceCalculator();
+
+                var ppAttributes = performanceCalculator?.Calculate(score.ScoreInfo, difficultyAttributes);
 
                 Console.WriteLine(f);
                 writeAttribute("Player", score.ScoreInfo.User.Username);
@@ -50,14 +57,14 @@ namespace PerformanceCalculator.Performance
                     ? score.ScoreInfo.Mods.Select(m => m.Acronym).Aggregate((c, n) => $"{c}, {n}")
                     : "None");
 
-                foreach (var kvp in categoryAttribs)
-                    writeAttribute(kvp.Key, kvp.Value.ToString(CultureInfo.InvariantCulture));
+                var ppAttributeValues = JsonConvert.DeserializeObject<Dictionary<string, object>>(JsonConvert.SerializeObject(ppAttributes)) ?? new Dictionary<string, object>();
+                foreach (var attrib in ppAttributeValues)
+                    writeAttribute(attrib.Key.Humanize(), FormattableString.Invariant($"{attrib.Value:N2}"));
 
-                writeAttribute("pp", pp.ToString(CultureInfo.InvariantCulture));
                 Console.WriteLine();
             }
         }
 
-        private void writeAttribute(string name, string value) => Console.WriteLine($"{name.PadRight(15)}: {value}");
+        private void writeAttribute(string name, string value) => Console.WriteLine($"{name,-15}: {value}");
     }
 }

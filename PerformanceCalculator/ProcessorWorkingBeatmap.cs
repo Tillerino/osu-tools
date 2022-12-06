@@ -35,10 +35,10 @@ namespace PerformanceCalculator
         {
             this.beatmap = beatmap;
 
-            beatmap.BeatmapInfo.Ruleset = LegacyHelper.GetRulesetFromLegacyID(beatmap.BeatmapInfo.RulesetID).RulesetInfo;
+            beatmap.BeatmapInfo.Ruleset = LegacyHelper.GetRulesetFromLegacyID(beatmap.BeatmapInfo.Ruleset.OnlineID).RulesetInfo;
 
             if (beatmapId.HasValue)
-                beatmap.BeatmapInfo.OnlineID = beatmapId;
+                beatmap.BeatmapInfo.OnlineID = beatmapId.Value;
         }
 
         private static Beatmap readFromFile(string filename)
@@ -50,7 +50,7 @@ namespace PerformanceCalculator
 
         public static ProcessorWorkingBeatmap FromFileOrId(string fileOrId)
         {
-            if (fileOrId.EndsWith(".osu"))
+            if (fileOrId.EndsWith(".osu", StringComparison.Ordinal))
             {
                 if (!File.Exists(fileOrId))
                     throw new ArgumentException($"Beatmap file {fileOrId} does not exist.");
